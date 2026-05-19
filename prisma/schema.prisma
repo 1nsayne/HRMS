@@ -1,5 +1,3 @@
-// Step 2 will add the HRIS domain model.
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,4 +5,559 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  ARCHIVED
+}
+
+enum EmploymentStatus {
+  APPLICANT
+  PROBATIONARY
+  REGULAR
+  CONTRACTOR
+  SEPARATED
+  ARCHIVED
+}
+
+enum ApplicantStage {
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRING
+  EXPIRED
+  TERMINATED
+}
+
+enum DocumentOwnerType {
+  EMPLOYEE
+  APPLICANT
+  COMPANY
+}
+
+enum DocumentSensitivity {
+  INTERNAL
+  CONFIDENTIAL
+  RESTRICTED
+}
+
+enum DocumentStatus {
+  REQUESTED
+  UPLOADED
+  VERIFIED
+  REJECTED
+  EXPIRED
+  ARCHIVED
+}
+
+enum ActionItemType {
+  LEAVE
+  ATTENDANCE
+  DOCUMENT
+  ONBOARDING
+  PAYROLL
+  APPLICANT
+  APPROVAL
+  COMPLIANCE
+}
+
+enum ActionItemRisk {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ActionItemStatus {
+  OPEN
+  IN_REVIEW
+  BLOCKED
+  APPROVED
+  REJECTED
+  RESOLVED
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  COMPLETE
+  MISSING_CLOCK_IN
+  MISSING_CLOCK_OUT
+  LATE
+  UNDERTIME
+  OVERTIME_PENDING
+  CORRECTED
+}
+
+enum OnboardingTaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  displayName     String
+  externalSubject String?    @unique
+  status          UserStatus @default(INVITED)
+  lastLoginAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  employeeProfile Employee?
+  applicantProfile Applicant?
+  userRoles       UserRole[]
+  ownedActionItems ActionItem[] @relation("ActionItemOwner")
+  requestedApprovals Approval[] @relation("ApprovalRequester")
+  assignedApprovals Approval[] @relation("ApprovalApprover")
+  requestedLeaveRequests LeaveRequest[] @relation("LeaveRequester")
+  approvedLeaveRequests LeaveRequest[] @relation("LeaveApprover")
+  assignedOnboardingTasks OnboardingTask[] @relation("OnboardingAssignee")
+  auditEvents     AuditEvent[] @relation("AuditActor")
+
+  @@index([status])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  scopeType String   @default("global")
+  scopeId   String   @default("global")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId, scopeType, scopeId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  description String?
+  parentId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  parent    Department?  @relation("DepartmentTree", fields: [parentId], references: [id])
+  children  Department[] @relation("DepartmentTree")
+  jobRoles  JobRole[]
+  employees Employee[]
+  applicants Applicant[]
+
+  @@index([parentId])
+}
+
+model JobRole {
+  id           String   @id @default(cuid())
+  departmentId String
+  title        String
+  code         String   @unique
+  description  String?
+  level        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  department Department @relation(fields: [departmentId], references: [id])
+  employees  Employee[]
+  applicants Applicant[]
+
+  @@index([departmentId])
+}
+
+model Employee {
+  id               String           @id @default(cuid())
+  userId           String?          @unique
+  employeeNumber   String           @unique
+  firstName        String
+  middleName       String?
+  lastName         String
+  preferredName    String?
+  workEmail        String?          @unique
+  personalEmail    String?
+  phone            String?
+  branch           String?
+  departmentId     String
+  jobRoleId        String
+  managerId        String?
+  status           EmploymentStatus @default(PROBATIONARY)
+  hireDate         DateTime
+  probationEndDate DateTime?
+  separationDate   DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  user        User?       @relation(fields: [userId], references: [id])
+  department  Department @relation(fields: [departmentId], references: [id])
+  jobRole     JobRole    @relation(fields: [jobRoleId], references: [id])
+  manager     Employee?  @relation("EmployeeManager", fields: [managerId], references: [id])
+  directReports Employee[] @relation("EmployeeManager")
+
+  emergencyContacts EmergencyContact[]
+  contracts         EmploymentContract[]
+  convertedFromApplicant Applicant? @relation("ApplicantHiredEmployee")
+  documents         Document[] @relation("EmployeeDocuments")
+  actionItems       ActionItem[] @relation("EmployeeActionItems")
+  leaveRequests     LeaveRequest[]
+  attendanceRecords AttendanceRecord[]
+  onboardingTasks   OnboardingTask[] @relation("EmployeeOnboardingTasks")
+
+  @@index([departmentId])
+  @@index([jobRoleId])
+  @@index([managerId])
+  @@index([status])
+}
+
+model EmergencyContact {
+  id           String   @id @default(cuid())
+  employeeId   String
+  name         String
+  relationship String
+  phone        String
+  email        String?
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+}
+
+model Applicant {
+  id             String         @id @default(cuid())
+  userId         String?        @unique
+  departmentId   String?
+  jobRoleId      String?
+  firstName      String
+  lastName       String
+  email          String
+  phone          String?
+  stage          ApplicantStage @default(APPLIED)
+  source         String?
+  rating         Int?
+  appliedAt      DateTime       @default(now())
+  hiredEmployeeId String?       @unique
+  rejectedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  deletedAt      DateTime?
+
+  user           User?       @relation(fields: [userId], references: [id])
+  department     Department? @relation(fields: [departmentId], references: [id])
+  jobRole        JobRole?    @relation(fields: [jobRoleId], references: [id])
+  hiredEmployee  Employee?   @relation("ApplicantHiredEmployee", fields: [hiredEmployeeId], references: [id])
+  documents      Document[]  @relation("ApplicantDocuments")
+  actionItems    ActionItem[] @relation("ApplicantActionItems")
+  onboardingTasks OnboardingTask[] @relation("ApplicantOnboardingTasks")
+
+  @@index([departmentId])
+  @@index([jobRoleId])
+  @@index([stage])
+  @@index([email])
+}
+
+model EmploymentContract {
+  id           String         @id @default(cuid())
+  employeeId   String
+  contractType String
+  status       ContractStatus @default(DRAFT)
+  startDate    DateTime
+  endDate      DateTime?
+  salaryGrade  String?
+  documentId   String?        @unique
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+  document Document? @relation(fields: [documentId], references: [id])
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([endDate])
+}
+
+model DocumentType {
+  id                  String              @id @default(cuid())
+  name                String              @unique
+  description         String?
+  defaultSensitivity  DocumentSensitivity @default(CONFIDENTIAL)
+  requiresExpiry      Boolean             @default(false)
+  requiresAcknowledgement Boolean          @default(false)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  deletedAt           DateTime?
+
+  documents Document[]
+}
+
+model Document {
+  id              String              @id @default(cuid())
+  documentTypeId  String
+  ownerType       DocumentOwnerType
+  employeeId      String?
+  applicantId     String?
+  title           String
+  storageKey      String
+  fileName        String
+  mimeType        String
+  sizeBytes       Int?
+  sensitivity     DocumentSensitivity @default(CONFIDENTIAL)
+  status          DocumentStatus      @default(UPLOADED)
+  issuedAt        DateTime?
+  expiresAt       DateTime?
+  uploadedByUserId String?
+  acknowledgedAt  DateTime?
+  acknowledgedByUserId String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  deletedAt       DateTime?
+
+  documentType DocumentType @relation(fields: [documentTypeId], references: [id])
+  employee     Employee?    @relation("EmployeeDocuments", fields: [employeeId], references: [id])
+  applicant    Applicant?   @relation("ApplicantDocuments", fields: [applicantId], references: [id])
+  contract     EmploymentContract?
+
+  @@index([documentTypeId])
+  @@index([employeeId])
+  @@index([applicantId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([sensitivity])
+}
+
+model ActionItem {
+  id              String           @id @default(cuid())
+  type            ActionItemType
+  risk            ActionItemRisk   @default(MEDIUM)
+  status          ActionItemStatus @default(OPEN)
+  title           String
+  description     String?
+  policyReason    String?
+  recommendedStep String?
+  dueAt           DateTime?
+  ownerUserId     String?
+  employeeId      String?
+  applicantId     String?
+  sourceEntityType String?
+  sourceEntityId   String?
+  resolvedAt      DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  owner     User?      @relation("ActionItemOwner", fields: [ownerUserId], references: [id])
+  employee  Employee?  @relation("EmployeeActionItems", fields: [employeeId], references: [id])
+  applicant Applicant? @relation("ApplicantActionItems", fields: [applicantId], references: [id])
+  approvals Approval[]
+
+  @@index([type])
+  @@index([risk])
+  @@index([status])
+  @@index([dueAt])
+  @@index([ownerUserId])
+  @@index([employeeId])
+  @@index([applicantId])
+}
+
+model Approval {
+  id              String         @id @default(cuid())
+  actionItemId    String?
+  requesterUserId String
+  approverUserId  String
+  status          ApprovalStatus @default(PENDING)
+  subjectType     String
+  subjectId       String
+  decisionReason  String?
+  decidedAt       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  actionItem ActionItem? @relation(fields: [actionItemId], references: [id])
+  requester  User        @relation("ApprovalRequester", fields: [requesterUserId], references: [id])
+  approver   User        @relation("ApprovalApprover", fields: [approverUserId], references: [id])
+
+  @@index([actionItemId])
+  @@index([requesterUserId])
+  @@index([approverUserId])
+  @@index([status])
+  @@index([subjectType, subjectId])
+}
+
+model LeaveType {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  code            String   @unique
+  isPaid          Boolean  @default(true)
+  requiresApproval Boolean @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  leaveRequests LeaveRequest[]
+}
+
+model LeaveRequest {
+  id              String             @id @default(cuid())
+  employeeId      String
+  leaveTypeId     String
+  requesterUserId String?
+  approverUserId  String?
+  status          LeaveRequestStatus @default(DRAFT)
+  startsAt        DateTime
+  endsAt          DateTime
+  totalDays       Decimal            @db.Decimal(5, 2)
+  reason          String?
+  decisionReason  String?
+  decidedAt       DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deletedAt       DateTime?
+
+  employee  Employee  @relation(fields: [employeeId], references: [id])
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+  requester User?     @relation("LeaveRequester", fields: [requesterUserId], references: [id])
+  approver  User?     @relation("LeaveApprover", fields: [approverUserId], references: [id])
+
+  @@index([employeeId])
+  @@index([leaveTypeId])
+  @@index([status])
+  @@index([startsAt, endsAt])
+}
+
+model AttendanceRecord {
+  id          String           @id @default(cuid())
+  employeeId  String
+  workDate    DateTime
+  shiftCode   String?
+  clockInAt   DateTime?
+  clockOutAt  DateTime?
+  status      AttendanceStatus @default(COMPLETE)
+  lateMinutes Int              @default(0)
+  undertimeMinutes Int         @default(0)
+  overtimeMinutes  Int         @default(0)
+  correctionReason String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, workDate])
+  @@index([status])
+  @@index([workDate])
+}
+
+model OnboardingTask {
+  id             String               @id @default(cuid())
+  employeeId     String?
+  applicantId    String?
+  assignedToUserId String?
+  title          String
+  description    String?
+  status         OnboardingTaskStatus @default(TODO)
+  dueAt          DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  deletedAt      DateTime?
+
+  employee   Employee?  @relation("EmployeeOnboardingTasks", fields: [employeeId], references: [id])
+  applicant  Applicant? @relation("ApplicantOnboardingTasks", fields: [applicantId], references: [id])
+  assignedTo User?      @relation("OnboardingAssignee", fields: [assignedToUserId], references: [id])
+
+  @@index([employeeId])
+  @@index([applicantId])
+  @@index([assignedToUserId])
+  @@index([status])
+  @@index([dueAt])
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  summary     String
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([actorUserId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }
