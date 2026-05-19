@@ -1,12 +1,22 @@
 import { Badge } from '../../../components/ui/Badge'
+import { can } from '../../../lib/permissions/can'
+import type { RoleLens } from '../../../lib/permissions/role-lenses'
 import type { ActionItem } from '../schemas/actionItem.schema'
 import { PersonSnapshot } from './PersonSnapshot'
 
 type ActionDetailRailProps = {
   actionItem: ActionItem
+  activeRole: RoleLens
 }
 
-export function ActionDetailRail({ actionItem }: ActionDetailRailProps) {
+export function ActionDetailRail({
+  actionItem,
+  activeRole,
+}: ActionDetailRailProps) {
+  const canReadDocuments = can(activeRole, 'document:read')
+  const canReadPayroll = can(activeRole, 'payroll:read')
+  const canReadCases = can(activeRole, 'case:read')
+
   return (
     <div className="detail-grid">
       <div className="detail-hero">
@@ -52,11 +62,26 @@ export function ActionDetailRail({ actionItem }: ActionDetailRailProps) {
       <div>
         <h3>Attachments</h3>
         <div className="attachment-list">
-          {actionItem.attachments.map((attachment) => (
-            <span className="attachment" key={attachment}>
-              {attachment}
-            </span>
-          ))}
+          {canReadDocuments ? (
+            actionItem.attachments.map((attachment) => (
+              <span className="attachment" key={attachment}>
+                {attachment}
+              </span>
+            ))
+          ) : (
+            <span className="attachment">Restricted by role</span>
+          )}
+        </div>
+      </div>
+
+      <div className="restricted-grid">
+        <div className="policy-box">
+          <h3>Payroll impact</h3>
+          <p>{canReadPayroll ? 'Ready check pending payroll cutoff.' : 'Restricted'}</p>
+        </div>
+        <div className="policy-box">
+          <h3>Confidential notes</h3>
+          <p>{canReadCases ? 'No active HR case linked.' : 'Restricted'}</p>
         </div>
       </div>
 

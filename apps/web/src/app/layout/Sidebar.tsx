@@ -1,13 +1,21 @@
 import { appRoutes, type AppRoute } from '../navigation/appRoutes'
+import type { RoleLens } from '../../lib/permissions/role-lenses'
 import { RoleLensSwitcher } from './RoleLensSwitcher'
 import { ScopeSwitcher } from './ScopeSwitcher'
 
 type SidebarProps = {
   activeRoute: AppRoute
+  activeRole: RoleLens
   onRouteChange: (route: AppRoute) => void
+  onRoleChange: (role: RoleLens) => void
 }
 
-export function Sidebar({ activeRoute, onRouteChange }: SidebarProps) {
+export function Sidebar({
+  activeRoute,
+  activeRole,
+  onRoleChange,
+  onRouteChange,
+}: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -37,7 +45,7 @@ export function Sidebar({ activeRoute, onRouteChange }: SidebarProps) {
       </nav>
 
       <div className="sidebar__footer">
-        <RoleLensSwitcher />
+        <RoleLensSwitcher value={activeRole} onChange={onRoleChange} />
         <ScopeSwitcher />
       </div>
     </aside>

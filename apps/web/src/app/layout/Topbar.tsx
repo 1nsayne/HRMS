@@ -1,4 +1,10 @@
-export function Topbar() {
+import type { RoleLens } from '../../lib/permissions/role-lenses'
+
+type TopbarProps = {
+  activeRole: RoleLens
+}
+
+export function Topbar({ activeRole }: TopbarProps) {
   return (
     <header className="topbar">
       <div className="topbar__left">
@@ -19,7 +25,7 @@ export function Topbar() {
         </button>
         <button className="user-button" type="button">
           <span className="avatar avatar--small">E</span>
-          <span>Eljan</span>
+          <span>{activeRole}</span>
         </button>
       </div>
     </header>

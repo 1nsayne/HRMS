@@ -5,4 +5,6 @@ export const roleLenses = [
   'Payroll Officer',
   'Employee',
   'Applicant',
-]
+] as const
+
+export type RoleLens = (typeof roleLenses)[number]

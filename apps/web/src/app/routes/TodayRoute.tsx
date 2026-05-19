@@ -5,9 +5,14 @@ import { ActionQueue } from '../../features/today/components/ActionQueue'
 import { MetricStrip } from '../../features/today/components/MetricStrip'
 import { OperationsPulse } from '../../features/today/components/OperationsPulse'
 import { QueueFilters } from '../../features/today/components/QueueFilters'
+import type { RoleLens } from '../../lib/permissions/role-lenses'
 import { mockActionItems } from '../../lib/test-data/mockActionItems'
 
-export function TodayRoute() {
+type TodayRouteProps = {
+  activeRole: RoleLens
+}
+
+export function TodayRoute({ activeRole }: TodayRouteProps) {
   const [selectedId, setSelectedId] = useState(mockActionItems[0]?.id ?? '')
   const selectedItem =
     mockActionItems.find((item) => item.id === selectedId) ?? mockActionItems[0]
@@ -20,7 +25,7 @@ export function TodayRoute() {
           <h1>Today workspace</h1>
           <p className="muted">
             Resolve approvals, attendance exceptions, onboarding blockers, and
-            expiring document risks.
+            expiring document risks. Current lens: {activeRole}.
           </p>
         </div>
         <div className="lens-controls">
@@ -67,7 +72,7 @@ export function TodayRoute() {
             <BatchActionBar />
           </div>
           <div className="panel__body">
-            <ActionDetailRail actionItem={selectedItem} />
+            <ActionDetailRail actionItem={selectedItem} activeRole={activeRole} />
           </div>
         </section>
 
