@@ -1,0 +1,27 @@
+{
+  "name": "hrms",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Work-first HR Management System / HRIS monorepo.",
+  "type": "module",
+  "packageManager": "pnpm@10.18.0",
+  "scripts": {
+    "dev:web": "npm --prefix apps/web run dev",
+    "build:web": "npm --prefix apps/web run build",
+    "lint:web": "npm --prefix apps/web run lint",
+    "preview:web": "npm --prefix apps/web run preview",
+    "build": "npm --prefix apps/web run build",
+    "lint": "npm --prefix apps/web run lint",
+    "typecheck": "npm --prefix apps/web run build",
+    "dev:api": "echo Install workspace dependencies before running the API.",
+    "dev:worker": "echo Install workspace dependencies before running the worker.",
+    "test": "echo Tests will be added with the first backend/domain behavior."
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
